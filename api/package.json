@@ -1,0 +1,19 @@
+{
+  "name": "api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cookie-parser": "latest",
+    "express": "latest",
+    "pg": "latest",
+    "serverless-http": "latest",
+    "ts-trueskill": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "dotenv": "latest"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file=../.env _lib/dev-server.js"
+  }
+}

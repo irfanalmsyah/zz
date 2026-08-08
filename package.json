@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "devDependencies": {
+    "concurrently": "latest"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,client \"npm --prefix api run dev\" \"npm --prefix client run dev\""
+  }
+}
