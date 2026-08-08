@@ -6,7 +6,6 @@
     "cookie-parser": "latest",
     "express": "latest",
     "pg": "latest",
-    "serverless-http": "latest",
     "ts-trueskill": "latest",
     "zod": "latest"
   },
