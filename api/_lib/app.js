@@ -1,14 +1,23 @@
+console.log('[trace] app.js: importing cookie-parser');
 import cookieParser from 'cookie-parser';
+console.log('[trace] app.js: importing express');
 import express from 'express';
+console.log('[trace] app.js: importing zod');
 import { z } from 'zod';
+console.log('[trace] app.js: importing auth.js');
 import { login, logout, requireAuth, session } from './auth.js';
+console.log('[trace] app.js: importing db.js');
 import { pool, withTransaction } from './db.js';
+console.log('[trace] app.js: importing pagination.js');
 import { paginate, parsePagination } from './pagination.js';
+console.log('[trace] app.js: importing trueskill.js');
 import { computeLeaderboard } from './trueskill.js';
+console.log('[trace] app.js: all imports done, building express app');
 
 const app = express();
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
+console.log('[trace] app.js: middleware registered');
 
 const asyncHandler = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
@@ -78,7 +87,11 @@ async function hydrateMatch(match) {
 
 app.post('/api/login', login);
 app.post('/api/logout', logout);
-app.get('/api/session', session);
+app.get('/api/session', (req, res) => {
+  console.log('[trace] /api/session handler entered');
+  session(req, res);
+  console.log('[trace] /api/session handler responded');
+});
 
 app.get(
   '/api/games',
@@ -266,4 +279,5 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'internal error' });
 });
 
+console.log('[trace] app.js: all routes registered, exporting app');
 export default app;
