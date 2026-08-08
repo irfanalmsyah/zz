@@ -13,12 +13,10 @@
     "@emotion/styled": "^11",
     "@mui/material": "^7",
     "@tanstack/react-query": "^5",
+    "@vitejs/plugin-react": "^6.0.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^6.0.4",
+    "react-router-dom": "^7",
     "vite": "^8.2.0"
   }
 }
