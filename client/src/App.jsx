@@ -7,9 +7,11 @@ import GamesPage from './pages/GamesPage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MatchHistoryPage from './pages/MatchHistoryPage.jsx';
+import PlayerDetailPage from './pages/PlayerDetailPage.jsx';
 import PlayersPage from './pages/PlayersPage.jsx';
 import RatingHistoryPage from './pages/RatingHistoryPage.jsx';
 import RecordMatchPage from './pages/RecordMatchPage.jsx';
+import StatsPage from './pages/StatsPage.jsx';
 
 function RequireAuth({ authenticated, children }) {
   return authenticated ? children : <Navigate to="/login" replace />;
@@ -39,10 +41,12 @@ function AppShell() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/progress" element={<RatingHistoryPage />} />
+          <Route path="/stats" element={<StatsPage />} />
           <Route
             path="/history"
             element={<MatchHistoryPage authenticated={authenticated} />}
           />
+          <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route
             path="/players"
             element={

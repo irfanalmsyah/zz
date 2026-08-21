@@ -4,7 +4,14 @@ import { z } from 'zod';
 import { login, logout, requireAuth, session } from './auth.js';
 import { pool, withTransaction } from './db.js';
 import { paginate, parsePagination } from './pagination.js';
-import { computeLeaderboard, computeMatchRatingChanges, computeRatingHistory } from './trueskill.js';
+import {
+  computeActivitySummary,
+  computeHeadToHead,
+  computeLeaderboard,
+  computeMatchRatingChanges,
+  computeRatingHistory,
+  computeRatingSwings,
+} from './trueskill.js';
 
 const app = express();
 app.use(express.json());
@@ -157,6 +164,37 @@ app.get(
   asyncHandler(async (req, res) => {
     const items = await computeRatingHistory(req.params.gameId);
     res.json({ items });
+  })
+);
+
+app.get(
+  '/api/games/:gameId/head-to-head',
+  asyncHandler(async (req, res) => {
+    const { playerA, playerB } = req.query;
+    if (!playerA || !playerB || playerA === playerB) {
+      return res.status(400).json({ error: 'playerA and playerB are required and must be different' });
+    }
+    res.json(await computeHeadToHead(req.params.gameId, String(playerA), String(playerB)));
+  })
+);
+
+app.get(
+  '/api/games/:gameId/rating-swings',
+  asyncHandler(async (req, res) => {
+    let limit = parseInt(req.query.limit, 10);
+    if (!Number.isInteger(limit) || limit < 1) limit = 20;
+    limit = Math.min(limit, 100);
+    const items = await computeRatingSwings(req.params.gameId, limit);
+    res.json({ items });
+  })
+);
+
+app.get(
+  '/api/players/:id/activity',
+  asyncHandler(async (req, res) => {
+    const summary = await computeActivitySummary(req.params.id);
+    if (!summary) return res.status(404).json({ error: 'not found' });
+    res.json(summary);
   })
 );
 

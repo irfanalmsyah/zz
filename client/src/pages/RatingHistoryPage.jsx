@@ -1,5 +1,17 @@
 import ShowChartIcon from '@mui/icons-material/ShowChart';
-import { Box, Card, CardContent, Chip, FormControl, InputLabel, MenuItem, Select, Stack } from '@mui/material';
+import {
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../api.js';
@@ -11,9 +23,17 @@ import { colorForIndex } from '../palette.js';
 
 const DEFAULT_VISIBLE = 8;
 
+const METRIC_LABEL = {
+  conservative: 'Rating',
+  mu: 'Mu',
+  mu_band: 'Mu (± σ)',
+};
+
 export default function RatingHistoryPage() {
   const [gameId, setGameId] = useState('');
   const [hiddenIds, setHiddenIds] = useState(() => new Set());
+  const [metric, setMetric] = useState('conservative');
+  const [xMode, setXMode] = useState('index');
 
   const { data: gamesData } = useQuery({
     queryKey: ['games', 'all'],
@@ -64,16 +84,29 @@ export default function RatingHistoryPage() {
         subtitle="Each player's rating after every match they've played"
       />
 
-      <FormControl sx={{ mb: 3, minWidth: 220 }} size="small">
-        <InputLabel>Game</InputLabel>
-        <Select label="Game" value={gameId} onChange={(e) => setGameId(e.target.value)}>
-          {games.map((g) => (
-            <MenuItem key={g.id} value={g.id}>
-              {g.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: 'wrap', rowGap: 2 }} alignItems="center">
+        <FormControl sx={{ minWidth: 220 }} size="small">
+          <InputLabel>Game</InputLabel>
+          <Select label="Game" value={gameId} onChange={(e) => setGameId(e.target.value)}>
+            {games.map((g) => (
+              <MenuItem key={g.id} value={g.id}>
+                {g.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <ToggleButtonGroup size="small" value={metric} exclusive onChange={(_e, v) => v && setMetric(v)}>
+          <ToggleButton value="conservative">Rating</ToggleButton>
+          <ToggleButton value="mu">Mu</ToggleButton>
+          <ToggleButton value="mu_band">Mu ± σ</ToggleButton>
+        </ToggleButtonGroup>
+
+        <ToggleButtonGroup size="small" value={xMode} exclusive onChange={(_e, v) => v && setXMode(v)}>
+          <ToggleButton value="index">Match count</ToggleButton>
+          <ToggleButton value="date">Date</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
 
       {!gameId && (
         <EmptyState
@@ -96,7 +129,7 @@ export default function RatingHistoryPage() {
       {gameId && !isLoading && players.length > 0 && (
         <Card variant="outlined">
           <CardContent>
-            <LineChart series={series} />
+            <LineChart series={series} metric={metric} xMode={xMode} yLabel={METRIC_LABEL[metric]} />
             <Stack direction="row" spacing={1} sx={{ mt: 2.5, flexWrap: 'wrap', rowGap: 1 }}>
               {players.map((p) => {
                 const hidden = hiddenIds.has(p.player_id);

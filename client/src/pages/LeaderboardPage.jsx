@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
 import EmptyState from '../components/EmptyState.jsx';
@@ -143,7 +144,14 @@ export default function LeaderboardPage() {
                         <RankBadge rank={page * pageSize + i + 1} />
                       </TableCell>
                       <TableCell>
-                        <Stack direction="row" spacing={1.25} alignItems="center">
+                        <Stack
+                          direction="row"
+                          spacing={1.25}
+                          alignItems="center"
+                          component={RouterLink}
+                          to={`/players/${p.player_id}`}
+                          sx={{ textDecoration: 'none', color: 'inherit' }}
+                        >
                           <PlayerAvatar name={p.name} colorIndex={i} size={30} />
                           <Typography sx={{ fontWeight: 500 }}>{p.name}</Typography>
                         </Stack>

@@ -1,6 +1,7 @@
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -30,6 +31,7 @@ const PUBLIC_LINKS = [
   { to: '/leaderboard', label: 'Leaderboard', icon: EmojiEventsOutlinedIcon },
   { to: '/progress', label: 'Progress', icon: ShowChartOutlinedIcon },
   { to: '/history', label: 'History', icon: HistoryOutlinedIcon },
+  { to: '/stats', label: 'Stats', icon: InsightsOutlinedIcon },
 ];
 
 const AUTH_LINKS = [

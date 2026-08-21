@@ -40,11 +40,31 @@ function integerXTicks(xMax, targetCount = 8) {
   return ticks;
 }
 
-// series: [{ id, name, color, points: [{ match_number, conservative }] }]
-export default function LineChart({ series, yLabel = 'Rating' }) {
+function dateXTicks(xMin, xMax, targetCount = 6) {
+  if (xMin === xMax) return [xMin];
+  return Array.from({ length: targetCount }, (_, i) => xMin + (i / (targetCount - 1)) * (xMax - xMin));
+}
+
+function formatDate(ts) {
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function latestPointAtOrBefore(points, ts) {
+  let result = null;
+  for (const p of points) {
+    if (new Date(p.played_at).getTime() <= ts) result = p;
+    else break;
+  }
+  return result;
+}
+
+// series: [{ id, name, color, points: [{ match_number, played_at, mu, sigma, conservative }] }]
+// metric: 'conservative' | 'mu' | 'mu_band' (mu_band draws the mu line with a mu +/- sigma band)
+// xMode: 'index' (each player's own match count) | 'date' (shared calendar date)
+export default function LineChart({ series, metric = 'conservative', xMode = 'index', yLabel = 'Rating' }) {
   const containerRef = useRef(null);
   const [width, setWidth] = useState(640);
-  const [hover, setHover] = useState(null);
+  const [hoverX, setHoverX] = useState(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -57,29 +77,65 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
     return () => observer.disconnect();
   }, []);
 
-  const xMax = Math.max(1, ...series.map((s) => s.points.length));
+  const lineMetric = metric === 'mu_band' ? 'mu' : metric;
+  const getY = (p) => p[lineMetric];
+  const getX = (p) => (xMode === 'date' ? new Date(p.played_at).getTime() : p.match_number);
+
   const innerWidth = Math.max(0, width - PAD.left - PAD.right);
   const innerHeight = HEIGHT - PAD.top - PAD.bottom;
 
+  const xValues = series.flatMap((s) => s.points.map(getX));
+  const xMin = xMode === 'date' ? (xValues.length ? Math.min(...xValues) : 0) : 1;
+  const xMax =
+    xMode === 'date'
+      ? (xValues.length ? Math.max(...xValues) : 1)
+      : Math.max(1, ...series.map((s) => s.points.length));
+
+  const uniqueDates = useMemo(() => {
+    if (xMode !== 'date') return [];
+    const set = new Set();
+    series.forEach((s) => s.points.forEach((p) => set.add(new Date(p.played_at).getTime())));
+    return [...set].sort((a, b) => a - b);
+  }, [series, xMode]);
+
   const { yMin, yMax, yTicks } = useMemo(() => {
-    const values = series.flatMap((s) => s.points.map((p) => p.conservative));
+    const values =
+      metric === 'mu_band'
+        ? series.flatMap((s) => s.points.flatMap((p) => [p.mu + p.sigma, p.mu - p.sigma]))
+        : series.flatMap((s) => s.points.map((p) => p[lineMetric]));
     if (values.length === 0) return { yMin: 0, yMax: 1, yTicks: [0, 1] };
     const ticks = niceTicks(Math.min(...values), Math.max(...values));
     return { yMin: ticks[0], yMax: ticks[ticks.length - 1], yTicks: ticks };
-  }, [series]);
+  }, [series, metric, lineMetric]);
 
-  const xScale = (x) => PAD.left + (xMax === 1 ? innerWidth / 2 : ((x - 1) / (xMax - 1)) * innerWidth);
+  const xScale = (x) => PAD.left + (xMax === xMin ? innerWidth / 2 : ((x - xMin) / (xMax - xMin)) * innerWidth);
   const yScale = (y) => PAD.top + (1 - (y - yMin) / (yMax - yMin || 1)) * innerHeight;
 
-  const xTicks = integerXTicks(xMax);
+  const xTicks = xMode === 'date' ? dateXTicks(xMin, xMax) : integerXTicks(xMax);
   const showEndLabels = series.length > 0 && series.length <= 4;
 
   function handleMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const ratio = innerWidth === 0 ? 0 : (px - PAD.left) / innerWidth;
-    const xValue = Math.round(1 + ratio * (xMax - 1));
-    setHover(Math.min(xMax, Math.max(1, xValue)));
+
+    if (xMode === 'date') {
+      if (uniqueDates.length === 0) return;
+      const idealTs = xMin + ratio * (xMax - xMin);
+      let nearest = uniqueDates[0];
+      let bestDiff = Infinity;
+      for (const t of uniqueDates) {
+        const diff = Math.abs(t - idealTs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          nearest = t;
+        }
+      }
+      setHoverX(nearest);
+    } else {
+      const xValue = Math.round(1 + ratio * (xMax - 1));
+      setHoverX(Math.min(xMax, Math.max(1, xValue)));
+    }
   }
 
   if (series.length === 0) {
@@ -91,15 +147,25 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
     );
   }
 
-  const hoverRows = hover
-    ? series
-        .filter((s) => s.points.length >= hover)
-        .map((s) => ({ ...s, value: s.points[hover - 1].conservative }))
-        .sort((a, b) => b.value - a.value)
-    : [];
+  const hoverRows =
+    hoverX == null
+      ? []
+      : xMode === 'date'
+        ? series
+            .map((s) => {
+              const p = latestPointAtOrBefore(s.points, hoverX);
+              return p ? { ...s, value: getY(p) } : null;
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.value - a.value)
+        : series
+            .filter((s) => s.points.length >= hoverX)
+            .map((s) => ({ ...s, value: getY(s.points[hoverX - 1]) }))
+            .sort((a, b) => b.value - a.value);
 
-  const tooltipLeft = hover ? xScale(hover) : 0;
+  const tooltipLeft = hoverX == null ? 0 : xScale(hoverX);
   const tooltipOnRight = tooltipLeft > width - 180;
+  const hoverLabel = hoverX == null ? '' : xMode === 'date' ? formatDate(hoverX) : `Match ${hoverX}`;
 
   return (
     <Box ref={containerRef} sx={{ position: 'relative', width: '100%' }}>
@@ -108,9 +174,9 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
         height={HEIGHT}
         viewBox={`0 0 ${width} ${HEIGHT}`}
         role="img"
-        aria-label={`${yLabel} by match count for ${series.map((s) => s.name).join(', ')}`}
+        aria-label={`${yLabel} ${xMode === 'date' ? 'over time' : 'by match count'} for ${series.map((s) => s.name).join(', ')}`}
         onPointerMove={handleMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => setHoverX(null)}
       >
         {yTicks.map((t) => (
           <g key={t}>
@@ -137,7 +203,7 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
             fontSize={11}
             fill={AXIS_TEXT}
           >
-            {t}
+            {xMode === 'date' ? formatDate(t) : t}
           </text>
         ))}
         <text
@@ -147,24 +213,36 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
           fontSize={11}
           fill={AXIS_TEXT}
         >
-          Match count
+          {xMode === 'date' ? 'Date' : 'Match count'}
         </text>
 
         {series.map((s) => {
           const path = s.points
-            .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.match_number)} ${yScale(p.conservative)}`)
+            .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(getX(p))} ${yScale(getY(p))}`)
             .join(' ');
           const last = s.points[s.points.length - 1];
+
+          let bandPath = null;
+          if (metric === 'mu_band' && s.points.length > 0) {
+            const forward = s.points.map((p) => `${xScale(getX(p))},${yScale(p.mu + p.sigma)}`);
+            const backward = s.points
+              .slice()
+              .reverse()
+              .map((p) => `${xScale(getX(p))},${yScale(p.mu - p.sigma)}`);
+            bandPath = `M ${forward.join(' L ')} L ${backward.join(' L ')} Z`;
+          }
+
           return (
             <g key={s.id}>
+              {bandPath && <path d={bandPath} fill={s.color} fillOpacity={0.1} stroke="none" />}
               <path d={path} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               {last && (
-                <circle cx={xScale(last.match_number)} cy={yScale(last.conservative)} r={5} fill={s.color} stroke={SURFACE} strokeWidth={2} />
+                <circle cx={xScale(getX(last))} cy={yScale(getY(last))} r={5} fill={s.color} stroke={SURFACE} strokeWidth={2} />
               )}
               {last && showEndLabels && (
                 <text
-                  x={xScale(last.match_number) + 9}
-                  y={yScale(last.conservative)}
+                  x={xScale(getX(last)) + 9}
+                  y={yScale(getY(last))}
                   dy="0.32em"
                   fontSize={11}
                   fontWeight={600}
@@ -177,10 +255,10 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
           );
         })}
 
-        {hover && (
+        {hoverX != null && (
           <line
-            x1={xScale(hover)}
-            x2={xScale(hover)}
+            x1={xScale(hoverX)}
+            x2={xScale(hoverX)}
             y1={PAD.top}
             y2={HEIGHT - PAD.bottom}
             stroke="#c3c2b7"
@@ -189,7 +267,7 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
         )}
       </svg>
 
-      {hover && hoverRows.length > 0 && (
+      {hoverX != null && hoverRows.length > 0 && (
         <Box
           sx={{
             position: 'absolute',
@@ -207,7 +285,7 @@ export default function LineChart({ series, yLabel = 'Rating' }) {
           }}
         >
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Match {hover}
+            {hoverLabel}
           </Typography>
           {hoverRows.map((row) => (
             <Box key={row.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>

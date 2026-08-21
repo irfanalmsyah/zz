@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
 import EmptyState from '../components/EmptyState.jsx';
@@ -55,10 +56,19 @@ function TeamColumn({ team, won }) {
     <Stack spacing={1} flex={1} minWidth={160}>
       {team.map((p, i) => (
         <Stack key={p.player_id} direction="row" alignItems="center" spacing={1}>
-          <PlayerAvatar name={p.name} colorIndex={i} size={26} />
-          <Typography variant="body2" sx={{ fontWeight: won ? 600 : 400, flex: 1 }} noWrap>
-            {p.name}
-          </Typography>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={1}
+            component={RouterLink}
+            to={`/players/${p.player_id}`}
+            sx={{ flex: 1, minWidth: 0, textDecoration: 'none', color: 'inherit' }}
+          >
+            <PlayerAvatar name={p.name} colorIndex={i} size={26} />
+            <Typography variant="body2" sx={{ fontWeight: won ? 600 : 400 }} noWrap>
+              {p.name}
+            </Typography>
+          </Stack>
           {p.mu_after != null && <DeltaChip delta={p.mu_after - p.mu_before} />}
         </Stack>
       ))}
