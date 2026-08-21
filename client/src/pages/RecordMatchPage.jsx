@@ -1,25 +1,24 @@
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import {
   Box,
   Button,
-  Checkbox,
+  Card,
+  CardContent,
   FormControl,
-  FormControlLabel,
-  FormLabel,
   InputLabel,
   MenuItem,
-  Radio,
-  RadioGroup,
   Select,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiFetch } from '../api.js';
-
-function toggle(list, id) {
-  return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-}
+import PageHeader from '../components/PageHeader.jsx';
+import TeamPicker from '../components/TeamPicker.jsx';
+import Toast from '../components/Toast.jsx';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -27,6 +26,7 @@ function today() {
 
 export default function RecordMatchPage() {
   const queryClient = useQueryClient();
+  const [toast, setToast] = useState(null);
 
   const { data: gamesData } = useQuery({
     queryKey: ['games', 'all'],
@@ -60,99 +60,88 @@ export default function RecordMatchPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leaderboard', gameId] });
       queryClient.invalidateQueries({ queryKey: ['matches', gameId] });
+      queryClient.invalidateQueries({ queryKey: ['rating-history', gameId] });
       setTeam1([]);
       setTeam2([]);
-      window.alert('Match recorded');
+      setToast({ severity: 'success', message: 'Match recorded' });
     },
-    onError: (err) => window.alert(err.message),
+    onError: (err) => setToast({ severity: 'error', message: err.message }),
   });
 
   function submit(e) {
     e.preventDefault();
     if (!gameId || team1.length === 0 || team2.length === 0) {
-      window.alert('Pick a game and at least one player per team');
+      setToast({ severity: 'error', message: 'Pick a game and at least one player per team' });
       return;
     }
     recordMatch.mutate();
   }
 
   return (
-    <Box maxWidth={480}>
-      <Typography variant="h5" gutterBottom>
-        Record match
-      </Typography>
-      <Box component="form" onSubmit={submit}>
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>Game</InputLabel>
-          <Select label="Game" value={gameId} onChange={(e) => setGameId(e.target.value)}>
-            {games.map((g) => (
-              <MenuItem key={g.id} value={g.id}>
-                {g.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+    <Box maxWidth={560}>
+      <PageHeader icon={<AddCircleOutlineIcon />} title="Record match" subtitle="Log a result to update ratings" />
 
-        <TextField
-          type="date"
-          label="Date"
-          fullWidth
-          sx={{ mb: 2 }}
-          value={playedAt}
-          onChange={(e) => setPlayedAt(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
+      <Card variant="outlined">
+        <CardContent sx={{ p: 3 }}>
+          <Box component="form" onSubmit={submit}>
+            <Box display="flex" gap={2} mb={3} flexWrap="wrap">
+              <FormControl fullWidth sx={{ flex: 1, minWidth: 180 }}>
+                <InputLabel>Game</InputLabel>
+                <Select label="Game" value={gameId} onChange={(e) => setGameId(e.target.value)}>
+                  {games.map((g) => (
+                    <MenuItem key={g.id} value={g.id}>
+                      {g.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-        <Box display="flex" gap={2} mb={2} flexWrap="wrap">
-          <Box flex={1} minWidth={140}>
-            <FormLabel>Team 1</FormLabel>
-            {players.map((p) => (
-              <FormControlLabel
-                key={p.id}
-                label={p.name}
-                sx={{ display: 'block' }}
-                control={
-                  <Checkbox
-                    checked={team1.includes(p.id)}
-                    onChange={() => setTeam1((t) => toggle(t, p.id))}
-                  />
-                }
+              <TextField
+                type="date"
+                label="Date"
+                sx={{ flex: 1, minWidth: 180 }}
+                value={playedAt}
+                onChange={(e) => setPlayedAt(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
-            ))}
-          </Box>
-          <Box flex={1} minWidth={140}>
-            <FormLabel>Team 2</FormLabel>
-            {players.map((p) => (
-              <FormControlLabel
-                key={p.id}
-                label={p.name}
-                sx={{ display: 'block' }}
-                control={
-                  <Checkbox
-                    checked={team2.includes(p.id)}
-                    onChange={() => setTeam2((t) => toggle(t, p.id))}
-                  />
-                }
+            </Box>
+
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
+              Teams
+            </Typography>
+            <Box mb={3}>
+              <TeamPicker
+                players={players}
+                team1={team1}
+                team2={team2}
+                onChangeTeam1={setTeam1}
+                onChangeTeam2={setTeam2}
               />
-            ))}
+            </Box>
+
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              Outcome
+            </Typography>
+            <ToggleButtonGroup
+              value={outcome}
+              exclusive
+              onChange={(_e, value) => value && setOutcome(value)}
+              sx={{ mb: 3 }}
+              fullWidth
+            >
+              <ToggleButton value="team1_win">Team 1 wins</ToggleButton>
+              <ToggleButton value="team2_win">Team 2 wins</ToggleButton>
+              <ToggleButton value="draw">Draw</ToggleButton>
+            </ToggleButtonGroup>
+
+            <Button type="submit" variant="contained" size="large" disabled={recordMatch.isPending} fullWidth>
+              Record match
+            </Button>
           </Box>
-        </Box>
+        </CardContent>
+      </Card>
 
-        <FormControl sx={{ mb: 2 }}>
-          <FormLabel>Outcome</FormLabel>
-          <RadioGroup row value={outcome} onChange={(e) => setOutcome(e.target.value)}>
-            <FormControlLabel value="team1_win" control={<Radio />} label="Team 1 wins" />
-            <FormControlLabel value="team2_win" control={<Radio />} label="Team 2 wins" />
-            <FormControlLabel value="draw" control={<Radio />} label="Draw" />
-          </RadioGroup>
-        </FormControl>
-
-        <Box>
-          <Button type="submit" variant="contained" disabled={recordMatch.isPending}>
-            Record match
-          </Button>
-        </Box>
-      </Box>
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </Box>
   );
 }

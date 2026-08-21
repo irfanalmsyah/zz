@@ -1,34 +1,73 @@
+import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import {
   Box,
+  Card,
   FormControl,
   InputLabel,
   MenuItem,
   Select,
+  Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
   Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
+import EmptyState from '../components/EmptyState.jsx';
+import PageHeader from '../components/PageHeader.jsx';
+import PlayerAvatar from '../components/PlayerAvatar.jsx';
+import { TableSkeleton } from '../components/Skeletons.jsx';
+
+const MEDAL_COLORS = ['#eda100', '#a8a29e', '#c9803a'];
+
+function RankBadge({ rank }) {
+  const color = MEDAL_COLORS[rank - 1];
+  if (!color) {
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ width: 28, textAlign: 'center' }}>
+        {rank}
+      </Typography>
+    );
+  }
+  return (
+    <Box
+      sx={{
+        width: 28,
+        height: 28,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: `${color}22`,
+        color,
+        fontWeight: 700,
+        fontSize: 13,
+      }}
+    >
+      {rank}
+    </Box>
+  );
+}
 
 export default function LeaderboardPage() {
   const [gameId, setGameId] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
 
-  const { data: gamesData } = useQuery({
+  const { data: gamesData, isLoading: gamesLoading } = useQuery({
     queryKey: ['games', 'all'],
     queryFn: () => apiFetch('/api/games?pageSize=500'),
   });
-  const games = gamesData?.items ?? [];
+  const games = useMemo(() => gamesData?.items ?? [], [gamesData]);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['leaderboard', gameId, page, pageSize],
     queryFn: () => apiFetch(`/api/games/${gameId}/leaderboard?page=${page + 1}&pageSize=${pageSize}`),
     enabled: !!gameId,
@@ -36,10 +75,13 @@ export default function LeaderboardPage() {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Leaderboard
-      </Typography>
-      <FormControl sx={{ mb: 2, minWidth: 200 }}>
+      <PageHeader
+        icon={<EmojiEventsOutlinedIcon />}
+        title="Leaderboard"
+        subtitle="Ranked by conservative rating (μ − 3σ)"
+      />
+
+      <FormControl sx={{ mb: 3, minWidth: 220 }} size="small">
         <InputLabel>Game</InputLabel>
         <Select
           label="Game"
@@ -57,32 +99,78 @@ export default function LeaderboardPage() {
         </Select>
       </FormControl>
 
+      {!gamesLoading && games.length === 0 && (
+        <EmptyState
+          icon={<EmojiEventsOutlinedIcon />}
+          title="No games yet"
+          subtitle="Add a game to start tracking ratings."
+        />
+      )}
+
+      {!gameId && games.length > 0 && (
+        <EmptyState
+          icon={<EmojiEventsOutlinedIcon />}
+          title="Pick a game"
+          subtitle="Choose a game above to see its leaderboard."
+        />
+      )}
+
       {gameId && (
-        <>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>#</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell align="right">Rating</TableCell>
-                <TableCell align="right">Mu</TableCell>
-                <TableCell align="right">Sigma</TableCell>
-                <TableCell align="right">Matches</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(data?.items ?? []).map((p, i) => (
-                <TableRow key={p.player_id} sx={staggerSx(i)}>
-                  <TableCell>{page * pageSize + i + 1}</TableCell>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell align="right">{p.conservative.toFixed(1)}</TableCell>
-                  <TableCell align="right">{p.mu.toFixed(1)}</TableCell>
-                  <TableCell align="right">{p.sigma.toFixed(1)}</TableCell>
-                  <TableCell align="right">{p.matches_played}</TableCell>
+        <Card variant="outlined">
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell width={48}>#</TableCell>
+                  <TableCell>Player</TableCell>
+                  <TableCell align="right">Rating</TableCell>
+                  <TableCell align="right">Mu</TableCell>
+                  <TableCell align="right">Sigma</TableCell>
+                  <TableCell align="right">Matches</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
+                      <TableSkeleton columns={6} rows={6} />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (data?.items ?? []).map((p, i) => (
+                    <TableRow key={p.player_id} sx={staggerSx(i)} hover>
+                      <TableCell>
+                        <RankBadge rank={page * pageSize + i + 1} />
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1.25} alignItems="center">
+                          <PlayerAvatar name={p.name} colorIndex={i} size={30} />
+                          <Typography sx={{ fontWeight: 500 }}>{p.name}</Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {p.conservative.toFixed(1)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}>
+                        {p.mu.toFixed(1)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}>
+                        {p.sigma.toFixed(1)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}>
+                        {p.matches_played}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {!isLoading && (data?.items?.length ?? 0) === 0 && (
+            <EmptyState title="No matches recorded" subtitle="Record a match for this game to populate the leaderboard." />
+          )}
           <TablePagination
             component="div"
             count={data?.total ?? 0}
@@ -94,7 +182,7 @@ export default function LeaderboardPage() {
               setPage(0);
             }}
           />
-        </>
+        </Card>
       )}
     </Box>
   );

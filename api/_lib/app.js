@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { login, logout, requireAuth, session } from './auth.js';
 import { pool, withTransaction } from './db.js';
 import { paginate, parsePagination } from './pagination.js';
-import { computeLeaderboard, computeMatchRatingChanges } from './trueskill.js';
+import { computeLeaderboard, computeMatchRatingChanges, computeRatingHistory } from './trueskill.js';
 
 const app = express();
 app.use(express.json());
@@ -149,6 +149,14 @@ app.get(
     }));
 
     res.json(paginate(items, total, page, pageSize));
+  })
+);
+
+app.get(
+  '/api/games/:gameId/rating-history',
+  asyncHandler(async (req, res) => {
+    const items = await computeRatingHistory(req.params.gameId);
+    res.json({ items });
   })
 );
 

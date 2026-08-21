@@ -88,3 +88,27 @@ export async function computeMatchRatingChanges(gameId) {
   const { changesByMatch } = await replay(gameId);
   return changesByMatch;
 }
+
+// Rating trajectory per player: one point per match they played, in chronological
+// order, numbered by that player's own match count (not the game's match index).
+export async function computeRatingHistory(gameId) {
+  const { changesByMatch, names } = await replay(gameId);
+  const pointsByPlayer = new Map();
+
+  for (const change of changesByMatch.values()) {
+    for (const p of [...change.team1, ...change.team2]) {
+      const points = pointsByPlayer.get(p.player_id) ?? [];
+      points.push({
+        match_number: points.length + 1,
+        mu: p.mu_after,
+        sigma: p.sigma_after,
+        conservative: p.mu_after - 3 * p.sigma_after,
+      });
+      pointsByPlayer.set(p.player_id, points);
+    }
+  }
+
+  return [...pointsByPlayer.entries()]
+    .map(([player_id, points]) => ({ player_id, name: names.get(player_id), points }))
+    .sort((a, b) => b.points.length - a.points.length);
+}

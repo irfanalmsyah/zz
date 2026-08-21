@@ -1,4 +1,4 @@
-import { CircularProgress, Container } from '@mui/material';
+import { Box, Container, LinearProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { apiFetch } from './api.js';
@@ -8,6 +8,7 @@ import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MatchHistoryPage from './pages/MatchHistoryPage.jsx';
 import PlayersPage from './pages/PlayersPage.jsx';
+import RatingHistoryPage from './pages/RatingHistoryPage.jsx';
 import RecordMatchPage from './pages/RecordMatchPage.jsx';
 
 function RequireAuth({ authenticated, children }) {
@@ -22,9 +23,9 @@ function AppShell() {
 
   if (isLoading) {
     return (
-      <Container sx={{ mt: 4 }}>
-        <CircularProgress />
-      </Container>
+      <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0 }}>
+        <LinearProgress />
+      </Box>
     );
   }
 
@@ -37,6 +38,7 @@ function AppShell() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/progress" element={<RatingHistoryPage />} />
           <Route
             path="/history"
             element={<MatchHistoryPage authenticated={authenticated} />}

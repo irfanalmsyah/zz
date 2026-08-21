@@ -1,31 +1,33 @@
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import {
   Box,
   Button,
   Card,
   CardActions,
   CardContent,
-  Checkbox,
+  Chip,
+  Divider,
   FormControl,
-  FormControlLabel,
-  FormLabel,
   InputLabel,
   MenuItem,
-  Radio,
-  RadioGroup,
   Select,
   Stack,
   TablePagination,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
-
-function toggle(list, id) {
-  return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-}
+import EmptyState from '../components/EmptyState.jsx';
+import PageHeader from '../components/PageHeader.jsx';
+import PlayerAvatar from '../components/PlayerAvatar.jsx';
+import { CardListSkeleton } from '../components/Skeletons.jsx';
+import TeamPicker from '../components/TeamPicker.jsx';
+import Toast from '../components/Toast.jsx';
 
 const OUTCOME_LABEL = {
   team1_win: 'Team 1 won',
@@ -33,22 +35,32 @@ const OUTCOME_LABEL = {
   draw: 'Draw',
 };
 
-function names(team) {
-  return team.map((p) => p.name).join(', ');
-}
-
 function fmt(n) {
-  return n.toFixed(2);
+  return n.toFixed(1);
 }
 
-function RatingChanges({ team }) {
+function DeltaChip({ delta }) {
+  const positive = delta >= 0;
+  const color = delta === 0 ? 'text.secondary' : positive ? 'success.main' : 'error.main';
   return (
-    <Stack spacing={0.25} sx={{ mt: 0.5 }}>
-      {team.map((p) => (
-        <Typography key={p.player_id} variant="body2" color="text.secondary">
-          {p.name}: μ {fmt(p.mu_before)} → {fmt(p.mu_after)} ({p.mu_after >= p.mu_before ? '+' : ''}
-          {fmt(p.mu_after - p.mu_before)}), σ {fmt(p.sigma_before)} → {fmt(p.sigma_after)}
-        </Typography>
+    <Typography component="span" variant="caption" sx={{ fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
+      {positive ? '+' : ''}
+      {fmt(delta)}
+    </Typography>
+  );
+}
+
+function TeamColumn({ team, won }) {
+  return (
+    <Stack spacing={1} flex={1} minWidth={160}>
+      {team.map((p, i) => (
+        <Stack key={p.player_id} direction="row" alignItems="center" spacing={1}>
+          <PlayerAvatar name={p.name} colorIndex={i} size={26} />
+          <Typography variant="body2" sx={{ fontWeight: won ? 600 : 400, flex: 1 }} noWrap>
+            {p.name}
+          </Typography>
+          {p.mu_after != null && <DeltaChip delta={p.mu_after - p.mu_before} />}
+        </Stack>
       ))}
     </Stack>
   );
@@ -65,10 +77,7 @@ function EditMatchForm({ match, players, onSave, onCancel, saving }) {
       component="form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (team1.length === 0 || team2.length === 0) {
-          window.alert('Each team needs at least one player');
-          return;
-        }
+        if (team1.length === 0 || team2.length === 0) return;
         onSave({ played_at: playedAt, outcome, team1_player_ids: team1, team2_player_ids: team2 });
       }}
     >
@@ -81,50 +90,22 @@ function EditMatchForm({ match, players, onSave, onCancel, saving }) {
         onChange={(e) => setPlayedAt(e.target.value)}
         slotProps={{ inputLabel: { shrink: true } }}
       />
-      <Box display="flex" gap={2} mb={2} flexWrap="wrap">
-        <Box flex={1} minWidth={140}>
-          <FormLabel>Team 1</FormLabel>
-          {players.map((p) => (
-            <FormControlLabel
-              key={p.id}
-              label={p.name}
-              sx={{ display: 'block' }}
-              control={
-                <Checkbox
-                  checked={team1.includes(p.id)}
-                  onChange={() => setTeam1((t) => toggle(t, p.id))}
-                />
-              }
-            />
-          ))}
-        </Box>
-        <Box flex={1} minWidth={140}>
-          <FormLabel>Team 2</FormLabel>
-          {players.map((p) => (
-            <FormControlLabel
-              key={p.id}
-              label={p.name}
-              sx={{ display: 'block' }}
-              control={
-                <Checkbox
-                  checked={team2.includes(p.id)}
-                  onChange={() => setTeam2((t) => toggle(t, p.id))}
-                />
-              }
-            />
-          ))}
-        </Box>
+      <Box mb={2}>
+        <TeamPicker players={players} team1={team1} team2={team2} onChangeTeam1={setTeam1} onChangeTeam2={setTeam2} />
       </Box>
-      <FormControl sx={{ mb: 2 }}>
-        <FormLabel>Outcome</FormLabel>
-        <RadioGroup row value={outcome} onChange={(e) => setOutcome(e.target.value)}>
-          <FormControlLabel value="team1_win" control={<Radio />} label="Team 1 wins" />
-          <FormControlLabel value="team2_win" control={<Radio />} label="Team 2 wins" />
-          <FormControlLabel value="draw" control={<Radio />} label="Draw" />
-        </RadioGroup>
-      </FormControl>
+      <ToggleButtonGroup
+        value={outcome}
+        exclusive
+        onChange={(_e, value) => value && setOutcome(value)}
+        size="small"
+        sx={{ mb: 2 }}
+      >
+        <ToggleButton value="team1_win">Team 1 wins</ToggleButton>
+        <ToggleButton value="team2_win">Team 2 wins</ToggleButton>
+        <ToggleButton value="draw">Draw</ToggleButton>
+      </ToggleButtonGroup>
       <Stack direction="row" spacing={1}>
-        <Button type="submit" variant="contained" disabled={saving}>
+        <Button type="submit" variant="contained" disabled={saving || team1.length === 0 || team2.length === 0}>
           Save
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
@@ -138,6 +119,7 @@ export default function MatchHistoryPage({ authenticated }) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [editingId, setEditingId] = useState(null);
+  const [toast, setToast] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: gamesData } = useQuery({
@@ -153,7 +135,7 @@ export default function MatchHistoryPage({ authenticated }) {
   });
   const players = playersData?.items ?? [];
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['matches', gameId, page, pageSize],
     queryFn: () => apiFetch(`/api/games/${gameId}/matches?page=${page + 1}&pageSize=${pageSize}`),
     enabled: !!gameId,
@@ -162,6 +144,7 @@ export default function MatchHistoryPage({ authenticated }) {
   function invalidateAfterChange() {
     queryClient.invalidateQueries({ queryKey: ['matches', gameId] });
     queryClient.invalidateQueries({ queryKey: ['leaderboard', gameId] });
+    queryClient.invalidateQueries({ queryKey: ['rating-history', gameId] });
   }
 
   const updateMatch = useMutation({
@@ -171,21 +154,20 @@ export default function MatchHistoryPage({ authenticated }) {
       setEditingId(null);
       invalidateAfterChange();
     },
-    onError: (err) => window.alert(err.message),
+    onError: (err) => setToast({ severity: 'error', message: err.message }),
   });
 
   const deleteMatch = useMutation({
     mutationFn: (id) => apiFetch(`/api/matches/${id}`, { method: 'DELETE' }),
     onSuccess: invalidateAfterChange,
-    onError: (err) => window.alert(err.message),
+    onError: (err) => setToast({ severity: 'error', message: err.message }),
   });
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Match history
-      </Typography>
-      <FormControl sx={{ mb: 2, minWidth: 200 }}>
+      <PageHeader icon={<HistoryOutlinedIcon />} title="Match history" subtitle="Every recorded result, most recent first" />
+
+      <FormControl sx={{ mb: 3, minWidth: 220 }} size="small">
         <InputLabel>Game</InputLabel>
         <Select
           label="Game"
@@ -203,53 +185,70 @@ export default function MatchHistoryPage({ authenticated }) {
         </Select>
       </FormControl>
 
-      {gameId && (
+      {!gameId && (
+        <EmptyState icon={<HistoryOutlinedIcon />} title="Pick a game" subtitle="Choose a game above to see its match history." />
+      )}
+
+      {gameId && isLoading && <CardListSkeleton count={4} />}
+
+      {gameId && !isLoading && (
         <>
-          <Stack spacing={2}>
-            {(data?.items ?? []).map((m, i) => (
-              <Card key={m.id} variant="outlined" sx={staggerSx(i)}>
-                <CardContent>
-                  {editingId === m.id ? (
-                    <EditMatchForm
-                      match={m}
-                      players={players}
-                      saving={updateMatch.isPending}
-                      onCancel={() => setEditingId(null)}
-                      onSave={(payload) => updateMatch.mutate({ id: m.id, payload })}
-                    />
-                  ) : (
-                    <>
-                      <Typography variant="body2" color="text.secondary">
-                        {m.played_at}
-                      </Typography>
-                      <Typography>
-                        {names(m.team1)} vs {names(m.team2)}
-                      </Typography>
-                      <Typography variant="body2">{OUTCOME_LABEL[m.outcome]}</Typography>
-                      <RatingChanges team={m.team1} />
-                      <RatingChanges team={m.team2} />
-                    </>
+          {(data?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={<HistoryOutlinedIcon />} title="No matches yet" subtitle="Record a match for this game to see it here." />
+          ) : (
+            <Stack spacing={2}>
+              {data.items.map((m, i) => (
+                <Card key={m.id} variant="outlined" sx={staggerSx(i)}>
+                  <CardContent>
+                    {editingId === m.id ? (
+                      <EditMatchForm
+                        match={m}
+                        players={players}
+                        saving={updateMatch.isPending}
+                        onCancel={() => setEditingId(null)}
+                        onSave={(payload) => updateMatch.mutate({ id: m.id, payload })}
+                      />
+                    ) : (
+                      <>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+                          <Typography variant="body2" color="text.secondary">
+                            {m.played_at}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={OUTCOME_LABEL[m.outcome]}
+                            color={m.outcome === 'draw' ? 'default' : 'primary'}
+                            variant={m.outcome === 'draw' ? 'outlined' : 'filled'}
+                            sx={m.outcome !== 'draw' ? { bgcolor: 'primary.main', color: '#fff' } : undefined}
+                          />
+                        </Stack>
+                        <Stack direction="row" spacing={2} divider={<Divider orientation="vertical" flexItem />}>
+                          <TeamColumn team={m.team1} won={m.outcome === 'team1_win'} />
+                          <TeamColumn team={m.team2} won={m.outcome === 'team2_win'} />
+                        </Stack>
+                      </>
+                    )}
+                  </CardContent>
+                  {authenticated && editingId !== m.id && (
+                    <CardActions>
+                      <Button size="small" onClick={() => setEditingId(m.id)}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          if (window.confirm('Delete this match?')) deleteMatch.mutate(m.id);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </CardActions>
                   )}
-                </CardContent>
-                {authenticated && editingId !== m.id && (
-                  <CardActions>
-                    <Button size="small" onClick={() => setEditingId(m.id)}>
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => {
-                        if (window.confirm('Delete this match?')) deleteMatch.mutate(m.id);
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </CardActions>
-                )}
-              </Card>
-            ))}
-          </Stack>
+                </Card>
+              ))}
+            </Stack>
+          )}
           <TablePagination
             component="div"
             count={data?.total ?? 0}
@@ -263,6 +262,8 @@ export default function MatchHistoryPage({ authenticated }) {
           />
         </>
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </Box>
   );
 }
