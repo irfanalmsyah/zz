@@ -35,9 +35,19 @@ async function replay(gameId) {
 
   const ratings = new Map();
   const played = new Map();
+  const wins = new Map();
+  const losses = new Map();
+  const draws = new Map();
   const names = new Map();
   const getRating = (id) => ratings.get(id) ?? new Rating();
   const changesByMatch = new Map();
+
+  function tally(playerIds, outcome, forTeam) {
+    const result =
+      outcome === 'draw' ? 'draw' : outcome === `team${forTeam}_win` ? 'win' : 'loss';
+    const target = result === 'win' ? wins : result === 'loss' ? losses : draws;
+    for (const id of playerIds) target.set(id, (target.get(id) ?? 0) + 1);
+  }
 
   const toChange = (p, before, after) => ({
     player_id: p.player_id,
@@ -72,13 +82,15 @@ async function replay(gameId) {
       played.set(p.player_id, (played.get(p.player_id) ?? 0) + 1);
       names.set(p.player_id, p.name);
     });
+    tally(match.team1.map((p) => p.player_id), match.outcome, 1);
+    tally(match.team2.map((p) => p.player_id), match.outcome, 2);
   }
 
-  return { ratings, played, names, changesByMatch };
+  return { ratings, played, wins, losses, draws, names, changesByMatch };
 }
 
 export async function computeLeaderboard(gameId) {
-  const { ratings, played, names } = await replay(gameId);
+  const { ratings, played, wins, losses, draws, names } = await replay(gameId);
   return [...ratings.entries()]
     .map(([player_id, r]) => ({
       player_id,
@@ -87,6 +99,9 @@ export async function computeLeaderboard(gameId) {
       sigma: r.sigma,
       conservative: r.mu - 3 * r.sigma,
       matches_played: played.get(player_id),
+      wins: wins.get(player_id) ?? 0,
+      losses: losses.get(player_id) ?? 0,
+      draws: draws.get(player_id) ?? 0,
     }))
     .sort((a, b) => b.conservative - a.conservative);
 }

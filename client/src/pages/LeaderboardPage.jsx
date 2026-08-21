@@ -28,6 +28,28 @@ import { TableSkeleton } from '../components/Skeletons.jsx';
 
 const MEDAL_COLORS = ['#eda100', '#a8a29e', '#c9803a'];
 
+function WLDCell({ wins, losses, draws }) {
+  return (
+    <Typography component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+      <Typography component="span" sx={{ color: 'success.main', fontWeight: 600 }}>
+        {wins}
+      </Typography>
+      <Typography component="span" color="text.secondary">
+        -
+      </Typography>
+      <Typography component="span" sx={{ color: 'error.main', fontWeight: 600 }}>
+        {losses}
+      </Typography>
+      <Typography component="span" color="text.secondary">
+        -
+      </Typography>
+      <Typography component="span" color="text.secondary">
+        {draws}
+      </Typography>
+    </Typography>
+  );
+}
+
 function RankBadge({ rank }) {
   const color = MEDAL_COLORS[rank - 1];
   if (!color) {
@@ -128,13 +150,14 @@ export default function LeaderboardPage() {
                   <TableCell align="right">Mu</TableCell>
                   <TableCell align="right">Sigma</TableCell>
                   <TableCell align="right">Matches</TableCell>
+                  <TableCell align="right">W-L-D</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
-                      <TableSkeleton columns={6} rows={6} />
+                    <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                      <TableSkeleton columns={7} rows={6} />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -169,6 +192,9 @@ export default function LeaderboardPage() {
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}>
                         {p.matches_played}
+                      </TableCell>
+                      <TableCell align="right">
+                        <WLDCell wins={p.wins} losses={p.losses} draws={p.draws} />
                       </TableCell>
                     </TableRow>
                   ))
