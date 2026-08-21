@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
 
 export default function LeaderboardPage() {
@@ -71,7 +72,7 @@ export default function LeaderboardPage() {
             </TableHead>
             <TableBody>
               {(data?.items ?? []).map((p, i) => (
-                <TableRow key={p.player_id}>
+                <TableRow key={p.player_id} sx={staggerSx(i)}>
                   <TableCell>{page * pageSize + i + 1}</TableCell>
                   <TableCell>{p.name}</TableCell>
                   <TableCell align="right">{p.conservative.toFixed(1)}</TableCell>

@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
 
 function toggle(list, id) {
@@ -34,6 +35,23 @@ const OUTCOME_LABEL = {
 
 function names(team) {
   return team.map((p) => p.name).join(', ');
+}
+
+function fmt(n) {
+  return n.toFixed(2);
+}
+
+function RatingChanges({ team }) {
+  return (
+    <Stack spacing={0.25} sx={{ mt: 0.5 }}>
+      {team.map((p) => (
+        <Typography key={p.player_id} variant="body2" color="text.secondary">
+          {p.name}: μ {fmt(p.mu_before)} → {fmt(p.mu_after)} ({p.mu_after >= p.mu_before ? '+' : ''}
+          {fmt(p.mu_after - p.mu_before)}), σ {fmt(p.sigma_before)} → {fmt(p.sigma_after)}
+        </Typography>
+      ))}
+    </Stack>
+  );
 }
 
 function EditMatchForm({ match, players, onSave, onCancel, saving }) {
@@ -188,8 +206,8 @@ export default function MatchHistoryPage({ authenticated }) {
       {gameId && (
         <>
           <Stack spacing={2}>
-            {(data?.items ?? []).map((m) => (
-              <Card key={m.id} variant="outlined">
+            {(data?.items ?? []).map((m, i) => (
+              <Card key={m.id} variant="outlined" sx={staggerSx(i)}>
                 <CardContent>
                   {editingId === m.id ? (
                     <EditMatchForm
@@ -208,6 +226,8 @@ export default function MatchHistoryPage({ authenticated }) {
                         {names(m.team1)} vs {names(m.team2)}
                       </Typography>
                       <Typography variant="body2">{OUTCOME_LABEL[m.outcome]}</Typography>
+                      <RatingChanges team={m.team1} />
+                      <RatingChanges team={m.team2} />
                     </>
                   )}
                 </CardContent>

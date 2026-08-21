@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
 
 export default function PlayersPage() {
@@ -74,8 +75,8 @@ export default function PlayersPage() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {(data?.items ?? []).map((p) => (
-            <TableRow key={p.id}>
+          {(data?.items ?? []).map((p, i) => (
+            <TableRow key={p.id} sx={staggerSx(i)}>
               <TableCell>{p.name}</TableCell>
               <TableCell align="right">
                 <Button

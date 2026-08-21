@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { login, logout, requireAuth, session } from './auth.js';
 import { pool, withTransaction } from './db.js';
 import { paginate, parsePagination } from './pagination.js';
-import { computeLeaderboard } from './trueskill.js';
+import { computeLeaderboard, computeMatchRatingChanges } from './trueskill.js';
 
 const app = express();
 app.use(express.json());
@@ -138,12 +138,14 @@ app.get(
       (row.team === 1 ? roster.team1 : roster.team2).push({ player_id: row.player_id, name: row.name });
     }
 
+    const changesByMatch = await computeMatchRatingChanges(gameId);
+
     const items = matchRows.map((m) => ({
       id: m.id,
       played_at: m.played_at,
       outcome: m.outcome,
-      team1: rosterByMatch.get(m.id)?.team1 ?? [],
-      team2: rosterByMatch.get(m.id)?.team2 ?? [],
+      team1: changesByMatch.get(m.id)?.team1 ?? rosterByMatch.get(m.id)?.team1 ?? [],
+      team2: changesByMatch.get(m.id)?.team2 ?? rosterByMatch.get(m.id)?.team2 ?? [],
     }));
 
     res.json(paginate(items, total, page, pageSize));
