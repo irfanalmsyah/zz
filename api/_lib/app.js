@@ -18,22 +18,6 @@ app.set('trust proxy', true);
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-// Temporary: dump what the function actually receives, to debug a Vercel
-// rewrite mismatch -- remove once the vercel.json rewrite chain is confirmed working.
-app.get('/api/__debug', (req, res) => {
-  res.json({ url: req.url, path: req.path, originalUrl: req.originalUrl, query: req.query, headers: req.headers });
-});
-app.get('/api/__debug/:gameId', (req, res) => {
-  res.json({ url: req.url, path: req.path, originalUrl: req.originalUrl, params: req.params, query: req.query, headers: req.headers });
-});
-// Catches the request no matter what path Express actually sees for it.
-app.use((req, res, next) => {
-  const ua = req.headers['user-agent'] || '';
-  if (/facebookexternalhit/i.test(ua)) {
-    return res.json({ debug: true, method: req.method, url: req.url, path: req.path, originalUrl: req.originalUrl, baseUrl: req.baseUrl });
-  }
-  next();
-});
 
 const asyncHandler = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
@@ -461,8 +445,15 @@ app.get(
   })
 );
 
-// Player meta shells are registered before the generic /api/meta/:kind/:gameId
-// route below (same path shape -- 'player' would otherwise be read as a kind).
+// These handlers are registered on the SAME paths the React app uses
+// (/games/:gameId/leaderboard, /players/:id, etc). A Vercel rewrite in
+// vercel.json only routes a request here when its User-Agent matches a known
+// link-preview crawler (see the "has" conditions there) -- Vercel invokes this
+// function but always hands it the ORIGINAL request path (a rewrite's
+// `destination` only selects which function runs, it doesn't change what path
+// the function receives), so matching the real frontend path is the only way
+// this actually dispatches. Everyone else's requests for these paths never
+// reach the function at all; they're served the static SPA shell directly.
 async function sendPlayerMeta(req, res, playerId, gameId) {
   const summary = await computeActivitySummary(playerId);
   if (!summary) return res.status(404).send('not found');
@@ -478,51 +469,53 @@ async function sendPlayerMeta(req, res, playerId, gameId) {
 }
 
 app.get(
-  '/api/meta/player/:playerId/:gameId',
-  asyncHandler(async (req, res) => sendPlayerMeta(req, res, req.params.playerId, req.params.gameId))
+  '/games/:gameId/players/:id',
+  asyncHandler(async (req, res) => sendPlayerMeta(req, res, req.params.id, req.params.gameId))
 );
 
 app.get(
-  '/api/meta/player/:playerId',
-  asyncHandler(async (req, res) => sendPlayerMeta(req, res, req.params.playerId, null))
+  '/players/:id',
+  asyncHandler(async (req, res) => sendPlayerMeta(req, res, req.params.id, null))
 );
 
-app.get(
-  '/api/meta/:kind/:gameId',
-  asyncHandler(async (req, res) => {
-    const { kind, gameId } = req.params;
+const GAME_META_KIND = {
+  leaderboard: { label: 'Leaderboard', path: 'leaderboard' },
+  progress: { label: 'Rating Progress', path: 'progress' },
+  history: { label: 'Match History', path: 'history' },
+  stats: { label: 'Biggest Rating Swings', path: 'stats' },
+};
 
-    const KIND = {
-      leaderboard: { label: 'Leaderboard', path: 'leaderboard' },
-      progress: { label: 'Rating Progress', path: 'progress' },
-      history: { label: 'Match History', path: 'history' },
-      stats: { label: 'Biggest Rating Swings', path: 'stats' },
-    }[kind];
-    if (!KIND) return res.status(404).send('not found');
+async function sendGameMeta(req, res, kind) {
+  const KIND = GAME_META_KIND[kind];
+  const { gameId } = req.params;
 
-    const gameName = await getGameName(gameId);
-    if (!gameName) return res.status(404).send('not found');
+  const gameName = await getGameName(gameId);
+  if (!gameName) return res.status(404).send('not found');
 
-    let description = gameName;
-    if (kind === 'leaderboard' || kind === 'progress') {
-      const all = await computeLeaderboard(gameId);
-      description = all.length
-        ? `${all[0].name} leads at ${all[0].conservative.toFixed(1)} · ${all.length} player${all.length === 1 ? '' : 's'}`
-        : 'No players ranked yet';
-    } else if (kind === 'stats') {
-      const [top] = await computeRatingSwings(gameId, 1);
-      description = top ? `Biggest mover: ${top.name} (${top.delta >= 0 ? '+' : ''}${top.delta.toFixed(1)})` : 'No matches yet';
-    } else if (kind === 'history') {
-      const { rows: countRows } = await pool.query('SELECT COUNT(*) FROM matches WHERE game_id = $1', [gameId]);
-      description = `${countRows[0].count} matches recorded`;
-    }
+  let description = gameName;
+  if (kind === 'leaderboard' || kind === 'progress') {
+    const all = await computeLeaderboard(gameId);
+    description = all.length
+      ? `${all[0].name} leads at ${all[0].conservative.toFixed(1)} · ${all.length} player${all.length === 1 ? '' : 's'}`
+      : 'No players ranked yet';
+  } else if (kind === 'stats') {
+    const [top] = await computeRatingSwings(gameId, 1);
+    description = top ? `Biggest mover: ${top.name} (${top.delta >= 0 ? '+' : ''}${top.delta.toFixed(1)})` : 'No matches yet';
+  } else if (kind === 'history') {
+    const { rows: countRows } = await pool.query('SELECT COUNT(*) FROM matches WHERE game_id = $1', [gameId]);
+    description = `${countRows[0].count} matches recorded`;
+  }
 
-    const title = `${gameName} — ${KIND.label}`;
-    const imageUrl = absoluteUrl(req, `/api/og/${kind}/${gameId}.png`);
-    const redirectUrl = `/games/${gameId}/${KIND.path}`;
-    res.send(metaHtml({ title, description, imageUrl, redirectUrl }));
-  })
-);
+  const title = `${gameName} — ${KIND.label}`;
+  const imageUrl = absoluteUrl(req, `/api/og/${kind}/${gameId}.png`);
+  const redirectUrl = `/games/${gameId}/${KIND.path}`;
+  res.send(metaHtml({ title, description, imageUrl, redirectUrl }));
+}
+
+app.get('/games/:gameId/leaderboard', asyncHandler((req, res) => sendGameMeta(req, res, 'leaderboard')));
+app.get('/games/:gameId/progress', asyncHandler((req, res) => sendGameMeta(req, res, 'progress')));
+app.get('/games/:gameId/history', asyncHandler((req, res) => sendGameMeta(req, res, 'history')));
+app.get('/games/:gameId/stats', asyncHandler((req, res) => sendGameMeta(req, res, 'stats')));
 
 // ---- Everything below requires the passcode ----
 

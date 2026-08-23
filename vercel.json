@@ -5,32 +5,32 @@
     {
       "source": "/games/:gameId/leaderboard",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/__debug/:gameId"
+      "destination": "/api/index.js"
     },
     {
       "source": "/games/:gameId/progress",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/meta/progress/:gameId"
+      "destination": "/api/index.js"
     },
     {
       "source": "/games/:gameId/history",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/meta/history/:gameId"
+      "destination": "/api/index.js"
     },
     {
       "source": "/games/:gameId/stats",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/meta/stats/:gameId"
+      "destination": "/api/index.js"
     },
     {
       "source": "/games/:gameId/players/:id",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/meta/player/:id/:gameId"
+      "destination": "/api/index.js"
     },
     {
       "source": "/players/:id",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/meta/player/:id"
+      "destination": "/api/index.js"
     },
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/(.*)", "destination": "/index.html" }
