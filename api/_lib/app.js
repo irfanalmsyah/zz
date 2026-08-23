@@ -20,6 +20,18 @@ app.use(cookieParser(process.env.COOKIE_SECRET));
 
 const asyncHandler = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
+// Temporary: surface the real error for the OG image pipeline instead of the
+// generic 500, since a rendering failure (native binding / font loading) is
+// currently only visible this way -- remove once the pipeline is confirmed stable.
+const ogHandler = (fn) => async (req, res) => {
+  try {
+    await fn(req, res);
+  } catch (err) {
+    console.error('OG render failed:', err);
+    res.status(500).json({ error: 'render failed', message: err?.message, stack: err?.stack?.split('\n').slice(0, 6) });
+  }
+};
+
 const validate = (schema) => (req, res, next) => {
   const result = schema.safeParse(req.body);
   if (!result.success) {
@@ -298,7 +310,7 @@ app.get(
 
 app.get(
   '/api/og/leaderboard/:gameId.png',
-  asyncHandler(async (req, res) => {
+  ogHandler(async (req, res) => {
     const { renderTableCardPng } = await import('./og.js');
     const { gameId } = req.params;
     const [gameName, all] = await Promise.all([getGameName(gameId), computeLeaderboard(gameId)]);
@@ -322,7 +334,7 @@ app.get(
 
 app.get(
   '/api/og/progress/:gameId.png',
-  asyncHandler(async (req, res) => {
+  ogHandler(async (req, res) => {
     const { renderTableCardPng } = await import('./og.js');
     const { gameId } = req.params;
     const [gameName, all] = await Promise.all([getGameName(gameId), computeLeaderboard(gameId)]);
@@ -346,7 +358,7 @@ app.get(
 
 app.get(
   '/api/og/stats/:gameId.png',
-  asyncHandler(async (req, res) => {
+  ogHandler(async (req, res) => {
     const { renderTableCardPng, OG_COLORS } = await import('./og.js');
     const { gameId } = req.params;
     const [gameName, swings] = await Promise.all([getGameName(gameId), computeRatingSwings(gameId, 10)]);
@@ -370,7 +382,7 @@ app.get(
 
 app.get(
   '/api/og/history/:gameId.png',
-  asyncHandler(async (req, res) => {
+  ogHandler(async (req, res) => {
     const { renderTableCardPng } = await import('./og.js');
     const { gameId } = req.params;
     const gameName = await getGameName(gameId);
@@ -398,7 +410,7 @@ app.get(
 
 app.get(
   '/api/og/player/:playerId.png',
-  asyncHandler(async (req, res) => {
+  ogHandler(async (req, res) => {
     const { renderPlayerCardPng } = await import('./og.js');
     const { playerId } = req.params;
     const { gameId } = req.query;
@@ -432,26 +444,36 @@ app.get(
   })
 );
 
+// Player meta shells are registered before the generic /api/meta/:kind/:gameId
+// route below (same path shape -- 'player' would otherwise be read as a kind).
+async function sendPlayerMeta(req, res, playerId, gameId) {
+  const summary = await computeActivitySummary(playerId);
+  if (!summary) return res.status(404).send('not found');
+
+  const scoped = gameId ? summary.games.find((g) => String(g.game_id) === String(gameId)) : null;
+  const title = scoped ? `${summary.name} — ${scoped.game_name}` : `${summary.name} — Ratings`;
+  const description = scoped
+    ? `Rating ${scoped.conservative != null ? scoped.conservative.toFixed(1) : '—'} · ${scoped.matches_played} matches in ${scoped.game_name}`
+    : `${summary.total_matches} matches across ${summary.games.length} game${summary.games.length === 1 ? '' : 's'}`;
+  const imageUrl = absoluteUrl(req, `/api/og/player/${playerId}.png${gameId ? `?gameId=${gameId}` : ''}`);
+  const redirectUrl = gameId ? `/games/${gameId}/players/${playerId}` : `/players/${playerId}`;
+  res.send(metaHtml({ title, description, imageUrl, redirectUrl }));
+}
+
 app.get(
-  '/api/meta/:kind',
+  '/api/meta/player/:playerId/:gameId',
+  asyncHandler(async (req, res) => sendPlayerMeta(req, res, req.params.playerId, req.params.gameId))
+);
+
+app.get(
+  '/api/meta/player/:playerId',
+  asyncHandler(async (req, res) => sendPlayerMeta(req, res, req.params.playerId, null))
+);
+
+app.get(
+  '/api/meta/:kind/:gameId',
   asyncHandler(async (req, res) => {
-    const { kind } = req.params;
-    const { gameId, playerId } = req.query;
-
-    if (kind === 'player') {
-      if (!playerId) return res.status(400).send('playerId required');
-      const summary = await computeActivitySummary(playerId);
-      if (!summary) return res.status(404).send('not found');
-
-      const scoped = gameId ? summary.games.find((g) => String(g.game_id) === String(gameId)) : null;
-      const title = scoped ? `${summary.name} — ${scoped.game_name}` : `${summary.name} — Ratings`;
-      const description = scoped
-        ? `Rating ${scoped.conservative != null ? scoped.conservative.toFixed(1) : '—'} · ${scoped.matches_played} matches in ${scoped.game_name}`
-        : `${summary.total_matches} matches across ${summary.games.length} game${summary.games.length === 1 ? '' : 's'}`;
-      const imageUrl = absoluteUrl(req, `/api/og/player/${playerId}.png${gameId ? `?gameId=${gameId}` : ''}`);
-      const redirectUrl = gameId ? `/games/${gameId}/players/${playerId}` : `/players/${playerId}`;
-      return res.send(metaHtml({ title, description, imageUrl, redirectUrl }));
-    }
+    const { kind, gameId } = req.params;
 
     const KIND = {
       leaderboard: { label: 'Leaderboard', path: 'leaderboard' },
@@ -460,7 +482,6 @@ app.get(
       stats: { label: 'Biggest Rating Swings', path: 'stats' },
     }[kind];
     if (!KIND) return res.status(404).send('not found');
-    if (!gameId) return res.status(400).send('gameId required');
 
     const gameName = await getGameName(gameId);
     if (!gameName) return res.status(404).send('not found');
