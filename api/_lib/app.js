@@ -26,6 +26,14 @@ app.get('/api/__debug', (req, res) => {
 app.get('/api/__debug/:gameId', (req, res) => {
   res.json({ url: req.url, path: req.path, originalUrl: req.originalUrl, params: req.params, query: req.query, headers: req.headers });
 });
+// Catches the request no matter what path Express actually sees for it.
+app.use((req, res, next) => {
+  const ua = req.headers['user-agent'] || '';
+  if (/facebookexternalhit/i.test(ua)) {
+    return res.json({ debug: true, method: req.method, url: req.url, path: req.path, originalUrl: req.originalUrl, baseUrl: req.baseUrl });
+  }
+  next();
+});
 
 const asyncHandler = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
