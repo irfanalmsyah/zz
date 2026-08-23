@@ -3,7 +3,6 @@ import express from 'express';
 import { z } from 'zod';
 import { login, logout, requireAuth, session } from './auth.js';
 import { pool, withTransaction } from './db.js';
-import { OG_COLORS, renderPlayerCardPng, renderTableCardPng } from './og.js';
 import { paginate, parsePagination } from './pagination.js';
 import {
   computeActivitySummary,
@@ -300,6 +299,7 @@ app.get(
 app.get(
   '/api/og/leaderboard/:gameId.png',
   asyncHandler(async (req, res) => {
+    const { renderTableCardPng } = await import('./og.js');
     const { gameId } = req.params;
     const [gameName, all] = await Promise.all([getGameName(gameId), computeLeaderboard(gameId)]);
     const rows = all.slice(0, 10).map((p, i) => ({
@@ -323,6 +323,7 @@ app.get(
 app.get(
   '/api/og/progress/:gameId.png',
   asyncHandler(async (req, res) => {
+    const { renderTableCardPng } = await import('./og.js');
     const { gameId } = req.params;
     const [gameName, all] = await Promise.all([getGameName(gameId), computeLeaderboard(gameId)]);
     const rows = all.slice(0, 10).map((p, i) => ({
@@ -346,6 +347,7 @@ app.get(
 app.get(
   '/api/og/stats/:gameId.png',
   asyncHandler(async (req, res) => {
+    const { renderTableCardPng, OG_COLORS } = await import('./og.js');
     const { gameId } = req.params;
     const [gameName, swings] = await Promise.all([getGameName(gameId), computeRatingSwings(gameId, 10)]);
     const rows = swings.map((s) => ({
@@ -369,6 +371,7 @@ app.get(
 app.get(
   '/api/og/history/:gameId.png',
   asyncHandler(async (req, res) => {
+    const { renderTableCardPng } = await import('./og.js');
     const { gameId } = req.params;
     const gameName = await getGameName(gameId);
     const { rows: matchRows } = await pool.query(
@@ -396,6 +399,7 @@ app.get(
 app.get(
   '/api/og/player/:playerId.png',
   asyncHandler(async (req, res) => {
+    const { renderPlayerCardPng } = await import('./og.js');
     const { playerId } = req.params;
     const { gameId } = req.query;
     const summary = await computeActivitySummary(playerId);
