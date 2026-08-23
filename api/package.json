@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@resvg/resvg-js": "latest",
     "cookie-parser": "latest",
     "express": "latest",
     "pg": "latest",
+    "satori": "latest",
     "ts-trueskill": "latest",
     "zod": "latest"
   },

@@ -2,6 +2,36 @@
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
+    {
+      "source": "/games/:gameId/leaderboard",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
+      "destination": "/api/meta/leaderboard?gameId=:gameId"
+    },
+    {
+      "source": "/games/:gameId/progress",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
+      "destination": "/api/meta/progress?gameId=:gameId"
+    },
+    {
+      "source": "/games/:gameId/history",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
+      "destination": "/api/meta/history?gameId=:gameId"
+    },
+    {
+      "source": "/games/:gameId/stats",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
+      "destination": "/api/meta/stats?gameId=:gameId"
+    },
+    {
+      "source": "/games/:gameId/players/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
+      "destination": "/api/meta/player?playerId=:id&gameId=:gameId"
+    },
+    {
+      "source": "/players/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
+      "destination": "/api/meta/player?playerId=:id"
+    },
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

@@ -1,3 +1,4 @@
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import {
   Box,
@@ -14,14 +15,17 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { staggerSx } from '../animations.js';
 import { apiFetch } from '../api.js';
 import EmptyState from '../components/EmptyState.jsx';
+import MatchCard from '../components/MatchCard.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import PlayerAvatar from '../components/PlayerAvatar.jsx';
 import { CardListSkeleton, StatRowSkeleton } from '../components/Skeletons.jsx';
@@ -31,9 +35,11 @@ function fmt(n) {
 }
 
 export default function PlayerDetailPage() {
-  const { id } = useParams();
-  const [h2hGameId, setH2hGameId] = useState('');
+  const { id, gameId } = useParams();
+  const [h2hGameId, setH2hGameId] = useState(gameId ?? '');
   const [opponentId, setOpponentId] = useState('');
+  const [matchPage, setMatchPage] = useState(0);
+  const [matchPageSize, setMatchPageSize] = useState(10);
 
   const { data: activity, isLoading: activityLoading } = useQuery({
     queryKey: ['activity', id],
@@ -59,6 +65,16 @@ export default function PlayerDetailPage() {
     enabled: !!h2hGameId && !!opponentId,
   });
 
+  const { data: matchesData, isLoading: matchesLoading } = useQuery({
+    queryKey: ['player-matches', id, gameId, matchPage, matchPageSize],
+    queryFn: () =>
+      apiFetch(
+        `/api/players/${id}/matches?page=${matchPage + 1}&pageSize=${matchPageSize}${gameId ? `&gameId=${gameId}` : ''}`
+      ),
+  });
+  const matches = matchesData?.items ?? [];
+  const gameName = gameId ? activity?.games?.find((g) => String(g.game_id) === String(gameId))?.game_name : null;
+
   const opponentName = opponents.find((p) => p.player_id === opponentId)?.name ?? 'Opponent';
 
   return (
@@ -66,7 +82,7 @@ export default function PlayerDetailPage() {
       <PageHeader
         icon={<PlayerAvatar name={activity?.name ?? '?'} colorIndex={Number(id) || 0} size={40} />}
         title={activity?.name ?? 'Player'}
-        subtitle="Activity across every game, and head-to-head records"
+        subtitle={gameName ? `Activity in ${gameName}, and head-to-head records` : 'Activity across every game, and head-to-head records'}
       />
 
       <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
@@ -107,6 +123,46 @@ export default function PlayerDetailPage() {
             </Card>
           ))}
         </Stack>
+      )}
+
+      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
+        Match history
+      </Typography>
+
+      {matchesLoading && <CardListSkeleton count={3} />}
+
+      {!matchesLoading && matches.length === 0 && (
+        <EmptyState
+          icon={<HistoryOutlinedIcon />}
+          title="No matches yet"
+          subtitle={gameName ? `No matches in ${gameName} yet.` : "This player hasn't played any matches yet."}
+        />
+      )}
+
+      {!matchesLoading && matches.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Stack spacing={2} sx={{ mb: 2 }}>
+            {matches.map((m, i) => (
+              <Card key={m.id} variant="outlined" sx={staggerSx(i)}>
+                <CardContent>
+                  <MatchCard match={m} gameName={gameId ? undefined : m.game_name} />
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+          <TablePagination
+            component="div"
+            count={matchesData?.total ?? 0}
+            page={matchPage}
+            onPageChange={(_e, newPage) => setMatchPage(newPage)}
+            rowsPerPage={matchPageSize}
+            rowsPerPageOptions={[5, 10, 25]}
+            onRowsPerPageChange={(e) => {
+              setMatchPageSize(parseInt(e.target.value, 10));
+              setMatchPage(0);
+            }}
+          />
+        </Box>
       )}
 
       <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>

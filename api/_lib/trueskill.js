@@ -39,6 +39,7 @@ async function replay(gameId) {
   const losses = new Map();
   const draws = new Map();
   const names = new Map();
+  const form = new Map();
   const getRating = (id) => ratings.get(id) ?? new Rating();
   const changesByMatch = new Map();
 
@@ -46,16 +47,20 @@ async function replay(gameId) {
     const result =
       outcome === 'draw' ? 'draw' : outcome === `team${forTeam}_win` ? 'win' : 'loss';
     const target = result === 'win' ? wins : result === 'loss' ? losses : draws;
-    for (const id of playerIds) target.set(id, (target.get(id) ?? 0) + 1);
+    const letter = result === 'win' ? 'W' : result === 'loss' ? 'L' : 'D';
+    for (const id of playerIds) {
+      target.set(id, (target.get(id) ?? 0) + 1);
+      const history = form.get(id) ?? [];
+      history.push(letter);
+      form.set(id, history);
+    }
   }
 
   const toChange = (p, before, after) => ({
     player_id: p.player_id,
     name: p.name,
-    mu_before: before.mu,
-    sigma_before: before.sigma,
-    mu_after: after.mu,
-    sigma_after: after.sigma,
+    conservative_before: before.mu - 3 * before.sigma,
+    conservative_after: after.mu - 3 * after.sigma,
   });
 
   for (const [matchId, match] of matches) {
@@ -86,27 +91,27 @@ async function replay(gameId) {
     tally(match.team2.map((p) => p.player_id), match.outcome, 2);
   }
 
-  return { ratings, played, wins, losses, draws, names, changesByMatch };
+  return { ratings, played, wins, losses, draws, names, form, changesByMatch };
 }
 
 export async function computeLeaderboard(gameId) {
-  const { ratings, played, wins, losses, draws, names } = await replay(gameId);
+  const { ratings, played, wins, losses, draws, names, form } = await replay(gameId);
   return [...ratings.entries()]
     .map(([player_id, r]) => ({
       player_id,
       name: names.get(player_id),
-      mu: r.mu,
-      sigma: r.sigma,
       conservative: r.mu - 3 * r.sigma,
       matches_played: played.get(player_id),
       wins: wins.get(player_id) ?? 0,
       losses: losses.get(player_id) ?? 0,
       draws: draws.get(player_id) ?? 0,
+      // Oldest-to-newest, most recent result last -- standard sports "form" convention.
+      form: (form.get(player_id) ?? []).slice(-5),
     }))
     .sort((a, b) => b.conservative - a.conservative);
 }
 
-// Per-match mu/sigma before and after, for every player in every match of the game.
+// Per-match conservative rating before and after, for every player in every match of the game.
 export async function computeMatchRatingChanges(gameId) {
   const { changesByMatch } = await replay(gameId);
   return changesByMatch;
@@ -124,9 +129,7 @@ export async function computeRatingHistory(gameId) {
       points.push({
         match_number: points.length + 1,
         played_at: change.played_at,
-        mu: p.mu_after,
-        sigma: p.sigma_after,
-        conservative: p.mu_after - 3 * p.sigma_after,
+        conservative: p.conservative_after,
       });
       pointsByPlayer.set(p.player_id, points);
     }
@@ -196,9 +199,9 @@ export async function computeRatingSwings(gameId, limit = 20) {
         outcome: change.outcome,
         player_id: p.player_id,
         name: p.name,
-        mu_before: p.mu_before,
-        mu_after: p.mu_after,
-        delta: p.mu_after - p.mu_before,
+        conservative_before: p.conservative_before,
+        conservative_after: p.conservative_after,
+        delta: p.conservative_after - p.conservative_before,
       });
     }
   }
@@ -238,8 +241,6 @@ export async function computeActivitySummary(playerId) {
       last_played: row.last_played,
       rank: rank === -1 ? null : rank + 1,
       conservative: entry?.conservative ?? null,
-      mu: entry?.mu ?? null,
-      sigma: entry?.sigma ?? null,
     });
   }
 

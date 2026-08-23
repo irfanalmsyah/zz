@@ -2,8 +2,10 @@ import { Box, Container, LinearProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { apiFetch } from './api.js';
+import GameLayout from './components/GameLayout.jsx';
 import NavBar from './components/NavBar.jsx';
 import GamesPage from './pages/GamesPage.jsx';
+import HomePage from './pages/HomePage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MatchHistoryPage from './pages/MatchHistoryPage.jsx';
@@ -38,14 +40,16 @@ function AppShell() {
       <NavBar authenticated={authenticated} />
       <Container sx={{ mt: 3, mb: 6 }}>
         <Routes>
+          <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/progress" element={<RatingHistoryPage />} />
-          <Route path="/stats" element={<StatsPage />} />
-          <Route
-            path="/history"
-            element={<MatchHistoryPage authenticated={authenticated} />}
-          />
+          <Route path="/games/:gameId" element={<GameLayout />}>
+            <Route index element={<Navigate to="leaderboard" replace />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
+            <Route path="progress" element={<RatingHistoryPage />} />
+            <Route path="history" element={<MatchHistoryPage authenticated={authenticated} />} />
+            <Route path="stats" element={<StatsPage />} />
+            <Route path="players/:id" element={<PlayerDetailPage />} />
+          </Route>
           <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route
             path="/players"
@@ -71,7 +75,7 @@ function AppShell() {
               </RequireAuth>
             }
           />
-          <Route path="*" element={<Navigate to="/leaderboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
     </>

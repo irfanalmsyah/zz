@@ -1,11 +1,7 @@
-import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
-import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
-import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined';
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import {
@@ -26,13 +22,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api.js';
-
-const PUBLIC_LINKS = [
-  { to: '/leaderboard', label: 'Leaderboard', icon: EmojiEventsOutlinedIcon },
-  { to: '/progress', label: 'Progress', icon: ShowChartOutlinedIcon },
-  { to: '/history', label: 'History', icon: HistoryOutlinedIcon },
-  { to: '/stats', label: 'Stats', icon: InsightsOutlinedIcon },
-];
 
 const AUTH_LINKS = [
   { to: '/record', label: 'Record match', icon: AddCircleOutlineIcon },
@@ -82,7 +71,7 @@ export default function NavBar({ authenticated }) {
   const isMobile = useMediaQuery('(max-width: 900px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const links = [...PUBLIC_LINKS, ...(authenticated ? AUTH_LINKS : [])];
+  const links = authenticated ? AUTH_LINKS : [];
 
   const logout = useMutation({
     mutationFn: () => apiFetch('/api/logout', { method: 'POST' }),
@@ -104,7 +93,7 @@ export default function NavBar({ authenticated }) {
           <Typography
             variant="h6"
             component={Link}
-            to="/leaderboard"
+            to="/"
             sx={{ mr: 3, color: 'primary.main', textDecoration: 'none', letterSpacing: -0.3 }}
           >
             Ratings

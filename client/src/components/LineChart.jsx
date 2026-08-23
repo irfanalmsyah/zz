@@ -58,10 +58,9 @@ function latestPointAtOrBefore(points, ts) {
   return result;
 }
 
-// series: [{ id, name, color, points: [{ match_number, played_at, mu, sigma, conservative }] }]
-// metric: 'conservative' | 'mu' | 'mu_band' (mu_band draws the mu line with a mu +/- sigma band)
+// series: [{ id, name, color, points: [{ match_number, played_at, conservative }] }]
 // xMode: 'index' (each player's own match count) | 'date' (shared calendar date)
-export default function LineChart({ series, metric = 'conservative', xMode = 'index', yLabel = 'Rating' }) {
+export default function LineChart({ series, xMode = 'index', yLabel = 'Rating' }) {
   const containerRef = useRef(null);
   const [width, setWidth] = useState(640);
   const [hoverX, setHoverX] = useState(null);
@@ -77,8 +76,7 @@ export default function LineChart({ series, metric = 'conservative', xMode = 'in
     return () => observer.disconnect();
   }, []);
 
-  const lineMetric = metric === 'mu_band' ? 'mu' : metric;
-  const getY = (p) => p[lineMetric];
+  const getY = (p) => p.conservative;
   const getX = (p) => (xMode === 'date' ? new Date(p.played_at).getTime() : p.match_number);
 
   const innerWidth = Math.max(0, width - PAD.left - PAD.right);
@@ -99,14 +97,11 @@ export default function LineChart({ series, metric = 'conservative', xMode = 'in
   }, [series, xMode]);
 
   const { yMin, yMax, yTicks } = useMemo(() => {
-    const values =
-      metric === 'mu_band'
-        ? series.flatMap((s) => s.points.flatMap((p) => [p.mu + p.sigma, p.mu - p.sigma]))
-        : series.flatMap((s) => s.points.map((p) => p[lineMetric]));
+    const values = series.flatMap((s) => s.points.map((p) => p.conservative));
     if (values.length === 0) return { yMin: 0, yMax: 1, yTicks: [0, 1] };
     const ticks = niceTicks(Math.min(...values), Math.max(...values));
     return { yMin: ticks[0], yMax: ticks[ticks.length - 1], yTicks: ticks };
-  }, [series, metric, lineMetric]);
+  }, [series]);
 
   const xScale = (x) => PAD.left + (xMax === xMin ? innerWidth / 2 : ((x - xMin) / (xMax - xMin)) * innerWidth);
   const yScale = (y) => PAD.top + (1 - (y - yMin) / (yMax - yMin || 1)) * innerHeight;
@@ -222,19 +217,8 @@ export default function LineChart({ series, metric = 'conservative', xMode = 'in
             .join(' ');
           const last = s.points[s.points.length - 1];
 
-          let bandPath = null;
-          if (metric === 'mu_band' && s.points.length > 0) {
-            const forward = s.points.map((p) => `${xScale(getX(p))},${yScale(p.mu + p.sigma)}`);
-            const backward = s.points
-              .slice()
-              .reverse()
-              .map((p) => `${xScale(getX(p))},${yScale(p.mu - p.sigma)}`);
-            bandPath = `M ${forward.join(' L ')} L ${backward.join(' L ')} Z`;
-          }
-
           return (
             <g key={s.id}>
-              {bandPath && <path d={bandPath} fill={s.color} fillOpacity={0.1} stroke="none" />}
               <path d={path} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
               {last && (
                 <circle cx={xScale(getX(last))} cy={yScale(getY(last))} r={5} fill={s.color} stroke={SURFACE} strokeWidth={2} />
