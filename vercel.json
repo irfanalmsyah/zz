@@ -5,7 +5,7 @@
     {
       "source": "/games/:gameId/leaderboard",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|pinterest|redditbot|imessage|skypeuripreview|vkshare|w3c_validator).*" }],
-      "destination": "/api/meta/leaderboard/:gameId"
+      "destination": "/api/__debug/:gameId"
     },
     {
       "source": "/games/:gameId/progress",
@@ -37,7 +37,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "api/_lib/fonts/**"
+      "includeFiles": "{api/_lib/fonts/**,api/node_modules/**/*.wasm}"
     }
   },
   "crons": [

@@ -18,6 +18,15 @@ app.set('trust proxy', true);
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
+// Temporary: dump what the function actually receives, to debug a Vercel
+// rewrite mismatch -- remove once the vercel.json rewrite chain is confirmed working.
+app.get('/api/__debug', (req, res) => {
+  res.json({ url: req.url, path: req.path, originalUrl: req.originalUrl, query: req.query, headers: req.headers });
+});
+app.get('/api/__debug/:gameId', (req, res) => {
+  res.json({ url: req.url, path: req.path, originalUrl: req.originalUrl, params: req.params, query: req.query, headers: req.headers });
+});
+
 const asyncHandler = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
 // Temporary: surface the real error for the OG image pipeline instead of the
